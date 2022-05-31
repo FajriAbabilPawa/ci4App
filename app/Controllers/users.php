@@ -8,6 +8,7 @@ class users extends BaseController
 	private $userModel=NULL;
 	function __construct(){
 		$this->userModel = new UserModel();
+        $this->email = \Config\Services::email();
 	}
 	public function index()
 	{
@@ -138,6 +139,7 @@ class users extends BaseController
 				$data = [
 					'error' => "Failed to Update Your Profile.",
 					'ErrorData' => $this->userModel->errors(),
+					'ErrorData' => $this->userModel->errors(),
 					'name'=>$this->request->getPost('name'),
 					'phone_no'=>$this->request->getPost('contact'),
 				];
@@ -187,4 +189,177 @@ class users extends BaseController
 		session()->setFlashData("Success", "Account Delete Successful ");
 		return redirect()->to(base_url()."/login");
 	}
+	
+	private function sendEmail($user)
+    {
+		$this->email = \Config\Services::email();
+		$this->email->setTo($user['email']);
+
+        $this->email->setSubject('Reset Password');
+        $this->email->setMessage(
+            '<h3>Hi, ' . $user['username'] . '</h3> 
+            Click here to reset your password: <br> 
+            <a href="' . base_url('reset-password/' . $user['token']) .
+                '" class="btn btn-primary"></a><br>or click the link below and use the token <br>' .
+                '<a href="' . base_url('reset-password') . '/' . $user['uuid'] . '">Reset Password</a><br>' .
+                '<br>Token: <h3>' . $user['token'] .  '</h3>'
+        );
+
+        if ($this->email->send()) {
+            session()->set('token', $user['token']);
+            return true;
+        } else {
+            echo $this->email->printDebugger();
+            return false;
+        }
+    }
+
+	public function ForgotPassword()
+    {
+        $data = [
+            'title' => 'Forgot Your Password ?',
+        ];
+
+        // validate email
+        if ($this->request->getMethod() == 'post') {
+            $rules = [
+                'email' => 'required|valid_email',
+            ];
+
+            $errors = [
+                'email' => [
+                    'required' => 'Field Email harus diisi',
+                    'valid_email' => 'Email harus valid "(Memakai @ dan .com)"',
+                ],
+            ];
+
+            if (!$this->validate($rules, $errors)) {
+                $data = [
+                    'title' => 'Forgot Your Password',
+                    'validation' => $this->validator,
+                    'email' => $this->request->getVar('email'),
+                ];
+
+                return view('forgot-password', $data);
+            } else {
+                $model = new UserModel();
+                $user = $model->where('email', $this->request->getVar('email'))->first();
+
+                if ($user) {
+                    $sendMail = $this->sendEmail([
+                        'email' => $this->request->getVar('email'),
+                        'username' => $model->getUsername($this->request->getVar('email'))['username'],
+                        'uuid' => $model->getId($this->request->getVar('email')),
+                        'token' => $model->createToken($this->request->getVar('email')),
+                    ]);
+
+                    if ($sendMail !== false) {
+                        session()->setFlashdata('success', 'Silahkan cek email anda untuk melakukan reset password<br><b>Link akan dihapus dalam 15 menit</b>');
+                        session()->markAsTempdata('success', 1);
+                        $data = [
+                            'user' => $this->request->getVar('email'),
+                            'title' => 'Login',
+                        ];
+
+                        return view('pages/login', $data);
+                    } else {
+                        session()->setTempdata('error', 'Email gagal dikirim, coba lagi', 3);
+                        session()->markAsTempdata('error', 1);
+                    }
+
+                    $data = [
+                        'title' => 'Forgot Your Password',
+                        'email' => $this->request->getVar('email'),
+                    ];
+                } else {
+                    $data = [
+                        'title' => 'Forgot Your Password',
+                        'email' => $this->request->getVar('email'),
+                    ];
+                    session()->setFlashdata('error', 'Email tidak terdaftar');
+                    session()->markAsTempdata('error', 1);
+                    return view('pages/forgot-password', $data);
+                }
+            }
+        }
+
+        return view('forgot-password', $data);
+    }
+	public function resetPassword($slug)
+    {
+        $model = new UserModel();
+        $data = [
+            'title' => 'Reset Password',
+            'slug' => $slug,
+        ];
+
+        $user = $model->where('id', $slug)->first();
+        if (null != $user) {
+            if ($user['token_expire'] > date('Y-m-d H:i:s')) {
+                if ($this->request->getMethod() == 'post') {
+                    $rules = [
+                        'token' => 'required|is_token_expired[token]',
+                        'user' => 'required|valid_email|is_exist[user]|is_token_in_email[user,token]',
+                        'password' => 'required|min_length[8]|max_length[255]',
+                        'pass_confirm' => 'required|matches[password]',
+                    ];
+                    $errors = [
+                        'token' => [
+                            'required' => 'Token tidak boleh kosong',
+                            'is_token' => 'Token tidak cocok',
+                            'is_token_expired' => 'Token sudah kadaluarsa',
+                        ],
+                        'user' => [
+                            'required' => 'Email tidak boleh kosong',
+                            'valid_email' => 'Email tidak valid',
+                            'is_exist' => 'Email tidak terdaftar',
+                            'is_token_in_email' => 'Token tidak cocok dengan email. Silahkan cek email anda',
+                        ],
+                        'password' => [
+                            'required' => 'Password tidak boleh kosong',
+                            'min_length' => 'Minimum karakter untuk Field password adalah 8 karakter',
+                            'max_length' => 'Maksimum karakter untuk Field password adalah 255 karakter',
+                        ],
+                        'pass_confirm' => [
+                            'required' => 'Konfirmasi password tidak boleh kosong',
+                            'matches' => 'Konfirmasi password tidak cocok',
+                        ],
+                    ];
+
+                    if (!$this->validate($rules, $errors)) {
+                        $data = [
+                            'validation' => $this->validator,
+                            'title' => 'Reset Password',
+                            'slug' => $slug,
+                            'token' => $this->request->getPost('token'),
+                            'user' => $this->request->getPost('user'),
+                        ];
+                    } else {
+                        $user = $model->where('email', $this->request->getVar('user'))->first();
+
+                        $data = [
+                            'title' => 'Login',
+                            'token' => null,
+                            'token_expire' => null,
+                            'password' => $this->request->getVar('password'),
+                            'user' => $user['email'],
+                        ];
+
+                        $model->update($user['id'], $data);
+
+                        session()->destroy();
+                        session()->set('success', 'Password berhasil diubah');
+
+                        return view('pages/login', $data);
+                    }
+                }
+            } else {
+                session()->setTempdata('expired', 'expired', 3);
+            }
+        } else {
+            session()->setTempdata('not-found', 'not found', 3);
+        }
+        return view('pages/reset-password', $data);
+    }
+
 }
