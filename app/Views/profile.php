@@ -23,11 +23,6 @@
                 <div class="row">
                     <div class="col-md-12" style="height: 50px;font-size: 25px;">
                         <a href="<?=base_url('/updateprofile')?>" class="btn btn-info">Update Profile</a>
-                        <a href="<?=base_url('/changepassword')?>" class="btn btn-danger">Delete My Account</a>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12" style="height: 50px;font-size: 25px;">
                         <a href="<?=base_url('/changepassword')?>" class="btn btn-info">Change Password</a>
                     </div>
                 </div>
