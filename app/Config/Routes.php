@@ -42,12 +42,12 @@ $routes->setAutoRoute(true);
 $routes->match(['get', 'post'], 'register', 'UserController::register', ['filter' => 'noauth']);
 $routes->match(['get', 'post'], 'login', 'UserController::login', ["filter" => "noauth"]);
 
-$routes->get('/', 'Home::index');
-$routes->get('/login', 'users::login', ['filter'=>'notLogged']);
-$routes->get('/register', 'User::register', ['filter'=>'notLogged']);
-$routes->post('/userRegister', 'User::userRegister');
-$routes->post('/userLogin', 'User::userLogin');
-$routes->get('profile', 'users::profile');
+$routes->get('/', 'Home::index', ['filter'=>'Noauth']);
+$routes->get('/login', 'users::login', ['filter'=>'Noauth']);
+$routes->get('/register', 'User::register', ['filter'=>'Noauth']);
+$routes->post('/userRegister', 'User::userRegister', ['filter'=>'Noauth']);
+$routes->post('/userLogin', 'User::userLogin', ['filter'=>'Noauth']);
+$routes->get('profile', 'users::profile', ['filter'=>'auth']);
 $routes->get('/logout', 'Usercontroller::logout', ['filter'=>'auth']);
 $routes->match(['get', 'post'], '/updateprofile', 'users::profileupdate', ['filter' => 'auth']);
 $routes->match(['get', 'post'], '/profileupdate', 'users::profileupdate', ['filter' => 'auth']);
